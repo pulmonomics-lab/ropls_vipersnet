@@ -1,0 +1,423 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+mathjax: null
+params:
+  group1: "tomt"
+  group2: "tomt"
+  secID: "tomt"
+  pcorr_Model1: 0
+  ortho_pre_vs_Model1: 0
+  ortho_post_vs_Model1: 0
+  setseedno: 0
+  p_pearson_of_pcorr_cutoff: 0
+  directory_input_matrix_sampleID: "tomt"
+  filename_matrix: "tomt"
+  decimal_separator: "tomt"
+  variable_names_length: 0
+  variable_names_position: "tomt"
+  filename_sampleID: "tomt"
+  directory_output_reports: "tomt"
+  projectname: "tomt"
+  date_of_analysis: 0
+  no_permutations_sans_vs: 0
+  no_permutations_post_vs: 0
+  no_permutations_post_vs_selected_models: 0
+  no_permutations_over_vs: 0
+  colname_groupID: "tomt"
+  colname_secID: "tomt"
+  replace_0: "tomt"
+  filter_percent_in_each_group: 0
+  replace_NA: "tomt"
+  log_transform: "tomt"
+  directory_and_filename_function_file: "tomt"
+  max_no_of_ortho_pre_vs: 0
+  max_no_of_ortho_post_vs: 0
+  prefered_pR2_and_pQ2_permutated_post_vs: 0
+  reordered_levels_of_groups: 0
+  pcorr_diff: 0
+  variable_selection_using_VIP: "tomt"
+  model_strategies_to_run: 0
+
+---
+
+---
+title: |
+    | ROPLS models `r gsub("_"," ",paste(params$projectname))`
+    | Model of group `r group1` versus `r group2` for `r secID`
+ 
+author: |
+    | roplspvs: Version 0.16.0
+    | R orthogonal projections of latent structures with permutation over variable selection
+    | Marika Strom
+date: `r Sys.Date()`
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, error = TRUE, fig.fullwidth = TRUE)
+# opts_chunk$set sets the parameters for the whole document
+```
+
+```{r, echo=FALSE}
+
+library("ropls")
+library("ggplot2")
+library("ggrepel")
+library(kableExtra)
+library(gridExtra)
+library("ggpubr")
+library("matrixStats")
+library(stringr)
+library(tryCatchLog)
+library(DescTools)
+library(precrec)
+library(pROC)
+library(rstatix)
+```
+
+```{r echo=FALSE}
+
+group1 <- params$group1
+group2 <- params$group2
+secID <- params$secID
+pcorr_Model1 <- params$pcorr_Model1
+ortho_pre_vs_Model1 <- params$ortho_pre_vs_Model1
+ortho_post_vs_Model1 <- params$ortho_post_vs_Model1
+setseedno <- params$setseedno
+p_pearson_of_pcorr_cutoff <- params$p_pearson_of_pcorr_cutoff
+directory_input_matrix_sampleID <- params$directory_input_matrix_sampleID
+filename_matrix <- params$filename_matrix
+decimal_separator <- params$decimal_separator
+variable_names_length <- params$variable_names_length
+variable_names_position <- params$variable_names_position
+filename_sampleID <- params$filename_sampleID
+directory_output_reports <- params$directory_output_reports
+projectname <- params$projectname
+date_of_analysis <- params$date_of_analysis
+no_permutations_sans_vs <- params$no_permutations_sans_vs
+no_permutations_post_vs <- params$no_permutations_post_vs
+no_permutations_post_vs_selected_models <- params$no_permutations_post_vs_selected_models
+no_permutations_over_vs <- params$no_permutations_over_vs
+colname_groupID <- params$colname_groupID
+colname_secID <- params$colname_secID
+replace_0 <- params$replace_0
+filter_percent_in_each_group <- params$filter_percent_in_each_group
+replace_NA <- params$replace_NA
+log_transform <- params$log_transform
+directory_and_filename_function_file <- params$directory_and_filename_function_file
+max_no_of_ortho_pre_vs <- params$max_no_of_ortho_pre_vs
+max_no_of_ortho_post_vs <- params$max_no_of_ortho_post_vs
+prefered_pR2_and_pQ2_permutated_post_vs <- params$prefered_pR2_and_pQ2_permutated_post_vs
+reordered_levels_of_groups <- params$reordered_levels_of_groups
+pcorr_diff <- params$pcorr_diff
+variable_selection_using_VIP <- params$variable_selection_using_VIP
+model_strategies_to_run <- params$model_strategies_to_run
+
+directory_and_filename_rdata <-paste(directory_output_reports, paste(paste(projectname,date_of_analysis, group1, "vs", group2, secID,sep="_"),".Rdata", sep = ""),sep="/")
+filename_rdata <- paste(paste(projectname, date_of_analysis, group1, "vs", group2, secID,sep="_"),".Rdata", sep = "")
+print(filename_rdata)
+source("scripts/roplspvs_Functions.R")
+directory_and_filename_function_file <- "scripts/roplspvs_Functions.R"
+```
+
+## Data to analysis
+
+```{R loading data}
+# Loading matrix and metadata
+
+directory_and_filename_input_matrix <- paste(directory_input_matrix_sampleID, "/", filename_matrix, sep = "")
+directory_and_filename_sampleID <- paste(directory_input_matrix_sampleID, "/", filename_sampleID, sep = "")
+
+directory_and_filename_input_matrix <- paste("..",directory_and_filename_input_matrix,sep="/")
+directory_and_filename_sampleID <- paste("..",directory_and_filename_sampleID,sep="/")
+
+# read datamatrix
+if (decimal_separator == "dot") {
+  datamatrix <- read.csv(directory_and_filename_input_matrix, header = T, dec = ".", row.names = 1, check.names = FALSE, na.strings = c("", "NA", "Inf"), sep = "\t")
+} else {
+  datamatrix <- read.csv(directory_and_filename_input_matrix, header = T, dec = ",", row.names = 1, check.names = FALSE, na.strings = c("", "NA", "Inf"), sep = "\t")
+}
+
+# Read meta data with sample information for annotation####
+if (decimal_separator == "dot") {
+  sampleID <- read.table(directory_and_filename_sampleID, header = T, dec = ".", row.names = 1, check.names = FALSE, na.strings = c("", "NA", "Inf"), sep = "\t")
+} else {
+  sampleID <- read.table(directory_and_filename_sampleID, header = T, dec = ",", row.names = 1, check.names = FALSE, na.strings = c("", "NA", "Inf"), sep = "\t")
+}
+```
+
+Project name: `r projectname`
+
+Date of analysis: `r as.character(date_of_analysis)`
+
+Directory data matrix and sample id: `r directory_input_matrix_sampleID`
+
+Filename data matrix: `r filename_matrix`
+
+Filname sample id: `r filename_sampleID`
+
+Directory and file name function file: `r directory_and_filename_function_file`
+
+Directory output reports: `r directory_output_reports`
+
+File name rdata: `r filename_rdata`
+
+Permutations sans variable selection: `r no_permutations_sans_vs`
+
+Permutations including variable selection in selected models: `r no_permutations_over_vs`
+
+Permutations after variable selection during model selection: `r no_permutations_post_vs`
+
+Permutations after variable selection in selected models: `r no_permutations_post_vs_selected_models`
+
+Missing value tolerance in each group: `r filter_percent_in_each_group`
+
+Model: group `r group1` vs group `r group2` for `r secID`
+
+max number of orthogonal variables in model pre variable selection: `r max_no_of_ortho_pre_vs`
+
+max number of orthogonal variables in model post variable selection: `r max_no_of_ortho_post_vs`
+
+prefered pR2 and pQ2 during model selection permutated post variable selection: `r prefered_pR2_and_pQ2_permutated_post_vs`
+
+pcorr increase allowing Q2 to decrease 1% during model selection in Model strategy 4: `r pcorr_diff`
+
+variable selection method: `r if(variable_selection_using_VIP=="yes") {paste("Using p(corr) and VIP")} else {paste("Using p(corr)")}`
+
+```{R subset sampleID and matrix}
+
+# subset sampleID and matrix
+
+subsetdatamatrix <-
+  subsetmatrixfunction(sampleID, datamatrix, group1, group2, secID)
+subsetsampleID <-
+  subsetsampleIDfunction(sampleID, group1, group2, secID)
+class <- as.factor(subsetsampleID[, paste(colname_groupID)])
+classordered <- class
+inv_reordered_levels_of_groups <- rev(reordered_levels_of_groups)
+levels(classordered) <- inv_reordered_levels_of_groups
+for (i in 1:length(class)) {
+  classordered[i] <- class[i]
+}
+classordered <- droplevels(classordered)
+
+#Preprocess
+if (replace_0 == "lld"|replace_NA == "lld") {
+  llq <- min(datamatrix[datamatrix != 0 & !is.na(datamatrix)])
+  lld <- llq / 3
+}
+
+if (replace_0 != F) {
+  if (replace_0 == "NA") {
+    subsetdatamatrix[subsetdatamatrix == 0] <-
+      NA
+  } else if (replace_0 == "lld") {
+    subsetdatamatrix[subsetdatamatrix == 0] <-
+      lld
+  } else {
+    subsetdatamatrix[subsetdatamatrix == 0] <- replace_0
+  }
+}
+subsetdatamatrixfiltered <-
+  filterNAfunction(
+    subsetsampleID,
+    subsetdatamatrix,
+    group1,
+    group2,
+    secID,
+    filter_percent_in_each_group
+  )
+if (replace_NA != F) {
+  if (replace_NA == "lld") {
+    subsetdatamatrixfiltered[is.na(subsetdatamatrixfiltered)] <-
+      lld
+  } else {
+    subsetdatamatrixfiltered[is.na(subsetdatamatrixfiltered)] <-
+      replace_NA
+  }
+}
+if (log_transform == T) {
+  subsetdatamatrixfiltered <- log(subsetdatamatrixfiltered)
+}
+
+subsetdatamatrixfiltereddf <-
+  as.data.frame(subsetdatamatrixfiltered)
+
+#convert character variables into dummy variables
+subsetdatamatrixdummies <- subsetdatamatrixfiltereddf
+tryCatch({
+  subsetdatamatrixdummies <-
+    fastDummies::dummy_cols(
+      subsetdatamatrixfiltereddf,
+      remove_selected_columns = TRUE,
+      ignore_na = TRUE
+    )
+  rownames(subsetdatamatrixdummies) <-
+    rownames(subsetdatamatrixfiltereddf)
+},
+error = function(e) {
+  rownames(subsetdatamatrixdummies) <-
+    rownames(subsetdatamatrixfiltereddf)
+})
+
+subsetdatamatrix <- subsetdatamatrixdummies
+for (i in 1:ncol(subsetdatamatrix)) {
+  subsetdatamatrix[, i] <- as.numeric(subsetdatamatrix[, i])
+}
+
+tsubsetdatamatrix <- t(subsetdatamatrix)
+set.seed(setseedno)
+```
+
+subject number group `r group1`: `r ngroup1 <- nrow(subset(subsetsampleID,subsetsampleID[,paste(colname_groupID)]==group1)); ngroup1`
+
+subject number group `r group2`: `r ngroup2 <- nrow(subset(subsetsampleID,subsetsampleID[,paste(colname_groupID)]==group2)); ngroup2`
+
+no of variables before filtering: `r no_of_variables_before_filtering <- ncol(datamatrix); no_of_variables_before_filtering`
+
+no of variables after filtering: `r no_of_variables_after_filtering <- ncol(subsetdatamatrixfiltereddf); no_of_variables_after_filtering`
+
+no of expanded variables after filtering: `r no_of_expanded_variables_after_filtering <- ncol(subsetdatamatrixdummies); no_of_expanded_variables_after_filtering`
+
+
+   
+
+```{R}
+
+if (pcorr_Model1 == "according to p-value") {
+  pcorr <- calculatepcorrfrompvalue(selectpvalue = p_pearson_of_pcorr_cutoff, n = nrow(subsetsampleID))
+} else {
+  pcorr <- pcorr_Model1
+}
+```
+## PCA 
+### All subjects included in comparison
+```{R PCA}
+plot(opls(subsetdatamatrix, info.txtC = "none"), parAsColFcVn = classordered, typeVc = "x-score")
+
+```
+
+### Subjects in `r group1`
+
+```{R PCA group1}
+subsetdatamatrix_group1 <-
+  subset(subsetdatamatrix, subsetsampleID[, paste(colname_groupID)] == group1)
+if (nrow(subsetdatamatrix_group1 < 7)) {
+  set_crossvalI <- nrow(subsetdatamatrix_group1)
+} else {
+  set_crossvalI <- 7
+}
+
+plot(opls(
+  subsetdatamatrix_group1,
+  info.txtC = "none",
+  crossvalI = set_crossvalI
+), typeVc = "x-score")
+
+```
+
+### Subjects in `r group2`
+
+```{R PCA group2}
+subsetdatamatrix_group2 <-
+  subset(subsetdatamatrix, subsetsampleID[, paste(colname_groupID)] == group2)
+if (nrow(subsetdatamatrix_group2 < 7)) {
+  set_crossvalI <- nrow(subsetdatamatrix_group2)
+} else {
+  set_crossvalI <- 7
+}
+
+plot(opls(
+  subsetdatamatrix_group2,
+  info.txtC = "none",
+  crossvalI = set_crossvalI
+),  typeVc = "x-score")
+
+```
+
+```{r, child=if (0 %in% model_strategies_to_run) 'roplspvs_Models_of_each_comparison_pre_vs.Rmd'}
+
+```
+
+```{r, child=if (1 %in% model_strategies_to_run) 'roplspvs_Models_of_each_comparison_strategy1.Rmd'}
+
+```
+
+```{r}
+first_analysis<-T
+if(file.exists(paste(directory_output_reports, filename_rdata,sep="/"))){first_analysis<-F}
+if(first_analysis==T){
+save(list = ls(all.names = TRUE), file = directory_and_filename_rdata, envir = environment())
+}
+
+```
+
+
+
+```{r, child=if (2 %in% model_strategies_to_run) 'roplspvs_Models_of_each_comparison_strategy2.Rmd'}
+
+```
+
+```{r}
+
+if(first_analysis==T){
+save(list = ls(all.names = TRUE), file = directory_and_filename_rdata, envir = environment())
+}
+
+```
+
+
+```{r, child=if (3 %in% model_strategies_to_run) 'roplspvs_Models_of_each_comparison_strategy3.Rmd'}
+
+```
+
+```{r}
+
+if(first_analysis==T){
+save(list = ls(all.names = TRUE), file = directory_and_filename_rdata, envir = environment())
+}
+
+```
+
+```{r, child=if (4 %in% model_strategies_to_run) 'roplspvs_Models_of_each_comparison_strategy4.Rmd'}
+
+```
+
+```{r}
+
+if(first_analysis==T){
+save(list = ls(all.names = TRUE), file = directory_and_filename_rdata, envir = environment())
+}
+
+```
+
+```{r, child=if (5 %in% model_strategies_to_run) 'roplspvs_Models_of_each_comparison_strategy5.Rmd'}
+
+```
+
+```{R}
+
+save(list = ls(all.names = TRUE), file = directory_and_filename_rdata, envir = environment())
+
+session_info(
+    pkgs = c("loaded")[1],
+    include_base = FALSE,
+    info = c("all"),
+    dependencies = NA,
+    to_file = paste(directory_output_reports,"/", "session-info_",projectname,
+    "_",date_of_analysis,"_created_",Sys.Date(),".txt", sep="")
+)
+
+#rm(list = setdiff(ls(envir = environment()), c("model_table_to_analyse", "filename_model_table_to_analyse", "directory_model_table_to_analyse", "projectname", "date_of_analysis", "directory_Rmarkdownfiles", "filename_Rmarkdownfile_each_model", "filename_Rmarkdownfile_summary", "directory_input_matrix_sampleID", "filename_matrix", "decimal_separator", "variable_names_length", "variable_names_position", "filename_sampleID", "colname_groupID", "colname_secID", "directory_output_reports", "directory_and_filename_function_file", "p_pearson_of_pcorr_cutoff", "no_permutations_sans_vs","no_permutations_post_vs", "no_permutations_post_vs_selected_models", "no_permutations_over_vs", "replace_0",  "filter_percent_in_each_group", "replace_NA","log_transform", "groupsnumeric", "max_no_of_ortho_pre_vs", "max_no_of_ortho_post_vs", "each_model_or_summary", "prefered_pR2_and_pQ2_permutated_post_vs", "cluster", "reordered_levels_of_groups", "pcorr_diff", "variable_selection_using_VIP", "model_strategies_to_run")))
+```
+
+
+Adding model 6 here to be run (actually should I add it here?)
+
+```{r, child=if (elastic == "yes") 'roplspvs_Models_of_each_comparison_strategy6.Rmd'}
+
+```
+

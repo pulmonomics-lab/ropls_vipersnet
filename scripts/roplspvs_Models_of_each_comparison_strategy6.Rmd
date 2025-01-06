@@ -1,0 +1,794 @@
+---
+title: "Model 6 elastic net"
+output: html_document
+date: "2024-12-02"
+---
+
+---
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+mathjax: null
+params:
+  group1: "tomt"
+  group2: "tomt"
+  secID: "tomt"
+  pcorr_Model1: 0
+  ortho_pre_vs_Model1: 0
+  ortho_post_vs_Model1: 0
+  setseedno: 0
+  p_pearson_of_pcorr_cutoff: 0
+  directory_input_matrix_sampleID: "tomt"
+  filename_matrix: "tomt"
+  decimal_separator: "tomt"
+  variable_names_length: 0
+  variable_names_position: "tomt"
+  filename_sampleID: "tomt"
+  directory_output_reports: "tomt"
+  projectname: "tomt"
+  date_of_analysis: 0
+  no_permutations_sans_vs: 0
+  no_permutations_post_vs: 0
+  no_permutations_post_vs_selected_models: 0
+  no_permutations_over_vs: 0
+  colname_groupID: "tomt"
+  colname_secID: "tomt"
+  replace_0: "tomt"
+  filter_percent_in_each_group: 0
+  replace_NA: "tomt"
+  log_transform: "tomt"
+  directory_and_filename_function_file: "tomt"
+  max_no_of_ortho_pre_vs: 0
+  max_no_of_ortho_post_vs: 0
+  prefered_pR2_and_pQ2_permutated_post_vs: 0
+  reordered_levels_of_groups: 0
+  pcorr_diff: 0
+  variable_selection_using_VIP: "tomt"
+  model_strategies_to_run: 0
+  alpha_val: 0
+  lambda_min: 0
+  lambda_max: 0
+  lambda_iter: 0
+
+---
+
+---
+title: |
+    | ROPLS models `r gsub("_"," ",paste(params$projectname))`
+    | Model of group `r group1` versus `r group2` for `r secID`
+ 
+author: |
+    | roplspvs: Version 0.16.0
+    | R orthogonal projections of latent structures with permutation over variable selection
+    | Marika Strom and Nicole Wagner
+date: `r Sys.Date()`
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, error = TRUE, fig.fullwidth = TRUE)
+# opts_chunk$set sets the parameters for the whole document
+```
+
+```{r, echo=FALSE}
+
+library("ropls")
+library("ggplot2")
+library("ggrepel")
+library(kableExtra)
+library(gridExtra)
+library("ggpubr")
+library("matrixStats")
+library(stringr)
+library(tryCatchLog)
+library(DescTools)
+library(precrec)
+library(pROC)
+library(rstatix)
+library(glmnet)
+library(caret)
+```
+
+```{r echo=FALSE}
+
+group1 <- params$group1
+group2 <- params$group2
+secID <- params$secID
+pcorr_Model1 <- params$pcorr_Model1
+ortho_pre_vs_Model1 <- params$ortho_pre_vs_Model1
+ortho_post_vs_Model1 <- params$ortho_post_vs_Model1
+setseedno <- params$setseedno
+p_pearson_of_pcorr_cutoff <- params$p_pearson_of_pcorr_cutoff
+directory_input_matrix_sampleID <- params$directory_input_matrix_sampleID
+filename_matrix <- params$filename_matrix
+decimal_separator <- params$decimal_separator
+variable_names_length <- params$variable_names_length
+variable_names_position <- params$variable_names_position
+filename_sampleID <- params$filename_sampleID
+directory_output_reports <- params$directory_output_reports
+projectname <- params$projectname
+date_of_analysis <- params$date_of_analysis
+no_permutations_sans_vs <- params$no_permutations_sans_vs
+no_permutations_post_vs <- params$no_permutations_post_vs
+no_permutations_post_vs_selected_models <- params$no_permutations_post_vs_selected_models
+no_permutations_over_vs <- params$no_permutations_over_vs
+colname_groupID <- params$colname_groupID
+colname_secID <- params$colname_secID
+replace_0 <- params$replace_0
+filter_percent_in_each_group <- params$filter_percent_in_each_group
+replace_NA <- params$replace_NA
+log_transform <- params$log_transform
+directory_and_filename_function_file <- params$directory_and_filename_function_file
+max_no_of_ortho_pre_vs <- params$max_no_of_ortho_pre_vs
+max_no_of_ortho_post_vs <- params$max_no_of_ortho_post_vs
+prefered_pR2_and_pQ2_permutated_post_vs <- params$prefered_pR2_and_pQ2_permutated_post_vs
+reordered_levels_of_groups <- params$reordered_levels_of_groups
+pcorr_diff <- params$pcorr_diff
+variable_selection_using_VIP <- params$variable_selection_using_VIP
+model_strategies_to_run <- params$model_strategies_to_run
+
+directory_and_filename_rdata <-paste(directory_output_reports, paste(paste(projectname,date_of_analysis, group1, "vs", group2, secID,sep="_"),".Rdata", sep = ""),sep="/")
+filename_rdata <- paste(paste(projectname, date_of_analysis, group1, "vs", group2, secID,sep="_"),".Rdata", sep = "")
+print(filename_rdata)
+source("scripts/roplspvs_Functions.R")
+directory_and_filename_function_file <- "scripts/roplspvs_Functions.R"
+```
+
+## Data to analysis
+
+```{R loading data}
+# Loading matrix and metadata
+
+directory_and_filename_input_matrix <- paste(directory_input_matrix_sampleID, "/", filename_matrix, sep = "")
+directory_and_filename_sampleID <- paste(directory_input_matrix_sampleID, "/", filename_sampleID, sep = "")
+
+directory_and_filename_input_matrix <- paste("..",directory_and_filename_input_matrix,sep="/")
+directory_and_filename_sampleID <- paste("..",directory_and_filename_sampleID,sep="/")
+
+# read datamatrix
+if (decimal_separator == "dot") {
+  datamatrix <- read.csv(directory_and_filename_input_matrix, header = T, dec = ".", row.names = 1, check.names = FALSE, na.strings = c("", "NA", "Inf"), sep = "\t")
+} else {
+  datamatrix <- read.csv(directory_and_filename_input_matrix, header = T, dec = ",", row.names = 1, check.names = FALSE, na.strings = c("", "NA", "Inf"), sep = "\t")
+}
+
+# Read meta data with sample information for annotation####
+if (decimal_separator == "dot") {
+  sampleID <- read.table(directory_and_filename_sampleID, header = T, dec = ".", row.names = 1, check.names = FALSE, na.strings = c("", "NA", "Inf"), sep = "\t")
+} else {
+  sampleID <- read.table(directory_and_filename_sampleID, header = T, dec = ",", row.names = 1, check.names = FALSE, na.strings = c("", "NA", "Inf"), sep = "\t")
+}
+```
+
+Project name: `r projectname`
+
+Date of analysis: `r as.character(date_of_analysis)`
+
+Directory data matrix and sample id: `r directory_input_matrix_sampleID`
+
+Filename data matrix: `r filename_matrix`
+
+Filname sample id: `r filename_sampleID`
+
+Directory and file name function file: `r directory_and_filename_function_file`
+
+Directory output reports: `r directory_output_reports`
+
+File name rdata: `r filename_rdata`
+
+Permutations sans variable selection: `r no_permutations_sans_vs`
+
+Permutations including variable selection in selected models: `r no_permutations_over_vs`
+
+Permutations after variable selection during model selection: `r no_permutations_post_vs`
+
+Permutations after variable selection in selected models: `r no_permutations_post_vs_selected_models`
+
+Missing value tolerance in each group: `r filter_percent_in_each_group`
+
+Model: group `r group1` vs group `r group2` for `r secID`
+
+max number of orthogonal variables in model pre variable selection: `r max_no_of_ortho_pre_vs`
+
+max number of orthogonal variables in model post variable selection: `r max_no_of_ortho_post_vs`
+
+prefered pR2 and pQ2 during model selection permutated post variable selection: `r prefered_pR2_and_pQ2_permutated_post_vs`
+
+pcorr increase allowing Q2 to decrease 1% during model selection in Model strategy 4: `r pcorr_diff`
+
+variable selection method: `r if(variable_selection_using_VIP=="yes") {paste("Using p(corr) and VIP")} else {paste("Using p(corr)")}`
+
+```{R subset sampleID and matrix}
+
+# subset sampleID and matrix
+
+subsetdatamatrix <-
+  subsetmatrixfunction(sampleID, datamatrix, group1, group2, secID)
+subsetsampleID <-
+  subsetsampleIDfunction(sampleID, group1, group2, secID)
+class <- as.factor(subsetsampleID[, paste(colname_groupID)])
+classordered <- class
+inv_reordered_levels_of_groups <- rev(reordered_levels_of_groups)
+levels(classordered) <- inv_reordered_levels_of_groups
+for (i in 1:length(class)) {
+  classordered[i] <- class[i]
+}
+classordered <- droplevels(classordered)
+
+#Preprocess
+if (replace_0 == "lld"|replace_NA == "lld") {
+  llq <- min(datamatrix[datamatrix != 0 & !is.na(datamatrix)])
+  lld <- llq / 3
+}
+
+if (replace_0 != F) {
+  if (replace_0 == "NA") {
+    subsetdatamatrix[subsetdatamatrix == 0] <-
+      NA
+  } else if (replace_0 == "lld") {
+    subsetdatamatrix[subsetdatamatrix == 0] <-
+      lld
+  } else {
+    subsetdatamatrix[subsetdatamatrix == 0] <- replace_0
+  }
+}
+subsetdatamatrixfiltered <-
+  filterNAfunction(
+    subsetsampleID,
+    subsetdatamatrix,
+    group1,
+    group2,
+    secID,
+    filter_percent_in_each_group
+  )
+if (replace_NA != F) {
+  if (replace_NA == "lld") {
+    subsetdatamatrixfiltered[is.na(subsetdatamatrixfiltered)] <-
+      lld
+  } else {
+    subsetdatamatrixfiltered[is.na(subsetdatamatrixfiltered)] <-
+      replace_NA
+  }
+}
+if (log_transform == T) {
+  subsetdatamatrixfiltered <- log(subsetdatamatrixfiltered)
+}
+
+subsetdatamatrixfiltereddf <-
+  as.data.frame(subsetdatamatrixfiltered)
+
+#convert character variables into dummy variables
+subsetdatamatrixdummies <- subsetdatamatrixfiltereddf
+tryCatch({
+  subsetdatamatrixdummies <-
+    fastDummies::dummy_cols(
+      subsetdatamatrixfiltereddf,
+      remove_selected_columns = TRUE,
+      ignore_na = TRUE
+    )
+  rownames(subsetdatamatrixdummies) <-
+    rownames(subsetdatamatrixfiltereddf)
+},
+error = function(e) {
+  rownames(subsetdatamatrixdummies) <-
+    rownames(subsetdatamatrixfiltereddf)
+})
+
+subsetdatamatrix <- subsetdatamatrixdummies
+for (i in 1:ncol(subsetdatamatrix)) {
+  subsetdatamatrix[, i] <- as.numeric(subsetdatamatrix[, i])
+}
+
+tsubsetdatamatrix <- t(subsetdatamatrix)
+set.seed(setseedno)
+```
+
+subject number group `r group1`: `r ngroup1 <- nrow(subset(subsetsampleID,subsetsampleID[,paste(colname_groupID)]==group1)); ngroup1`
+
+subject number group `r group2`: `r ngroup2 <- nrow(subset(subsetsampleID,subsetsampleID[,paste(colname_groupID)]==group2)); ngroup2`
+
+no of variables before filtering: `r no_of_variables_before_filtering <- ncol(datamatrix); no_of_variables_before_filtering`
+
+no of variables after filtering: `r no_of_variables_after_filtering <- ncol(subsetdatamatrixfiltereddf); no_of_variables_after_filtering`
+
+no of expanded variables after filtering: `r no_of_expanded_variables_after_filtering <- ncol(subsetdatamatrixdummies); no_of_expanded_variables_after_filtering`
+
+
+
+```{r}
+
+# defining the control
+control_repeatedcv <- trainControl(method = "repeatedcv", 
+                                   number = 10,  # Number of folds
+                                   repeats = 10, # Number of repetitions
+                                   classProbs = TRUE, 
+                                   summaryFunction = twoClassSummary)
+
+
+```
+
+
+```{r}
+## the subsetmatrix can be used here.
+set.seed(123)
+custom_grid <- expand.grid(
+  .alpha = alpha_val, 
+  .lambda = seq(lambda_min, lambda_max, length.out = lambda_iter) 
+)
+
+# Fit LASSO model
+
+#model6_function_glmnet(subsetdatamatrix,Group) #output variables of interest
+
+elastic_model <- train(subsetdatamatrix, Group,
+                       method = "glmnet", 
+                       trControl = control_repeatedcv,
+                       tuneGrid = custom_grid, 
+                       metric = "ROC")
+
+
+# Check the optimal lambda value
+best_lambda <- elastic_model$bestTune$lambda
+
+# Extract the selected features using the optimal lambda
+selected_vars <- coef(elastic_model$finalModel, s = best_lambda)
+
+selected_vars_df <- as.data.frame(selected_vars[,"s1"])
+
+colnames(selected_vars_df)[1] <- "s1"
+selected_vars_df <- selected_vars_df[-c(1),,drop=FALSE]
+selected_vars_df <- selected_vars_df[selected_vars_df$s1 != 0, ,drop=FALSE]
+
+## non zero lasso outputs
+selected_vars_final <- rownames(selected_vars_df)
+
+selected_vars_final
+
+```
+
+
+
+
+# OPLS with 0 ortho
+
+
+```{r}
+
+# Running opls-da with 0 orthogonals
+set.seed(123)
+
+subsetdatamatrix2 <-as.matrix(subsetdatamatrix[, selected_vars_final])
+
+# Run the PLS-DA analysis
+ropls_model_6_ortho0 <- opls(subsetdatamatrix2, 
+                      Group, 
+                      predI = 1, 
+                      orthoI = 0, 
+                      scaleC = "standard",
+                      info.txtC = "none",
+                      fig.pdfC = "none",
+                      permI = 1000)
+
+# function for getting the values
+
+scores <- ropls_model_6_ortho0@scoreMN
+# Calculate the correlation loadings (pcorr)
+pred_scores <- scores[, "p1"]
+# Now calculate the pearson correlation test
+results <- apply(subsetdatamatrix2, 2, function(x) {
+  cor_test <- cor.test(x, pred_scores)
+  c(correlation = cor_test$estimate, p_value = cor_test$p.value)
+})
+
+# Convert results to data frame for better readability
+pcorr_df <- as.data.frame(t(results))
+colnames(pcorr_df) <- c("correlation", "p_value")
+
+#  Apply a multiple testing correction if you are testing multiple correlations
+pcorr_df$adjusted_p_value <- p.adjust(pcorr_df$p_value, method = "BH")
+
+# standard error
+n_boot <- 1000
+n_features <- ncol(subsetdatamatrix2)
+boot_corrs <- matrix(NA, nrow = n_features, ncol = n_boot)
+
+for (i in 1:n_boot) {
+  # Resample indices with replacement
+  boot_indices <- sample(1:nrow(subsetdatamatrix2), replace = TRUE)
+  pred_scores_boot <- pred_scores[boot_indices]
+  
+  # Calculate bootstrapped correlations
+  boot_corrs[, i] <- apply(subsetdatamatrix2[boot_indices, ], 2, function(x) {
+    cor(x, pred_scores_boot)
+  })
+}
+# Calculate the standard error (SE) for each feature
+boot_se <- apply(boot_corrs, 1, sd)
+# Add the SE as a column to your data frame
+pcorr_df$se <- boot_se
+
+# VIP
+df_vip <- data.frame(ropls_model_6_ortho0@vipVn)
+ropls_data_ortho0 <- merge(pcorr_df,df_vip,by=0)
+colnames(ropls_data_ortho0) <- c("Feature","pcorr","p_value","adjusted_p_value","se","VIP")
+
+
+```
+
+
+```{r results='asis'}
+formatted_elastic_table_ortho0 <- ropls_data_ortho0 %>%
+  kable(
+    format = "html",  # For HTML output in R Markdown
+    col.names = c("Feature", "Correlation", "P-value", "Adjusted P-value", "Standard Error", "VIP"),
+    caption = "Correlation and VIP Scores for Features with 0 orthogonals"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE
+  ) %>%
+  column_spec(3:4, bold = TRUE, color = ifelse(ropls_data$adjusted_p_value < 0.05, "green", "red")) %>%
+  column_spec(6, background = "lightblue")
+```
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Overview of the OPLS model with 0 orthogonals."}
+plot(ropls_model_6_ortho0, typeVc = "overview") # Overview of the model
+```
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Loading values of the OPLS model with 0 orthogonals."}
+plot(ropls_model_6_ortho0, typeVc = "loading") # Loadings plot
+```
+
+```{r echo=FALSE, results="asis"}
+# Extract summary statistics from the OPLS model
+summary_results <- ropls_model_6_ortho0@modelSummary
+
+# Convert the summary data to a data frame for easy rendering
+summary_df <- as.data.frame(summary_results)
+
+# Display the summary as an HTML table
+
+kable(summary_df, caption = "Summary of OPLS Results with 0 orthogonals", format = "html")
+```
+
+```{r}
+volcano_plot_vip_ortho0 <- ggplot(ropls_data_ortho0, aes(x =pcorr, y = VIP, color = abs(pcorr) > 0.5)) +
+     geom_point() +
+     scale_color_manual(values = c("red", "black")) +
+     labs(title = "Volcano Plot 0 orthogonal",
+          x = "p(corr)",
+          y = "VIP") +
+     theme(legend.position = "none") +  
+   #    geom_text_repel(nudge_y = 0.05, box.padding = 0.3, point.padding = 0.2)
+   geom_text(data = subset(ropls_data_ortho0, abs(pcorr) > 0.5),
+                  aes(label = Feature), nudge_y = 0.01, nudge_x = -0.05, color = "blue",size=4)
+
+```
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="VIP volcano plot model with 0 orthogonals."}
+volcano_plot_vip_ortho0
+```
+
+
+```{r}
+
+ropls_data_sig_ortho0 <- filter(ropls_data_ortho0,adjusted_p_value < 0.05)
+
+sig_graph_ortho0 <- ggplot(ropls_data_sig_ortho0, aes(x = reorder(Feature, correlation), y = correlation)) +
+  geom_bar(stat = "identity", fill="maroon") +
+  coord_flip() + 
+   theme(axis.text.y = element_text(size = 3)) +
+  labs(title = "Features in ortho 0",
+       x = "",
+       y = "p(corr)") +
+    geom_errorbar(aes(ymin = correlation - se, ymax = correlation + se), width = 0.2)
+
+```
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Significant Features with 0 orthogonals."}
+sig_graph_ortho0
+```
+
+
+
+
+# OPLS with 1 ortho
+
+```{r}
+
+## Running opls-da with 1 orthogonal
+set.seed(123)
+
+subsetdatamatrix2 <-as.matrix(subsetdatamatrix[, selected_vars_final])
+
+# Run the PLS-DA analysis
+ropls_model_6_ortho1 <- opls(subsetdatamatrix2, 
+                      Group, 
+                      predI = 1, 
+                      orthoI = 1, 
+                      scaleC = "standard",
+                      info.txtC = "none",
+                      fig.pdfC = "none",
+                      permI = 1000)
+
+# function for getting the values
+
+scores <- ropls_model_6_ortho1@scoreMN
+# Calculate the correlation loadings (pcorr)
+pred_scores <- scores[, "p1"]
+# Now calculate the pearson correlation test
+results <- apply(subsetdatamatrix2, 2, function(x) {
+  cor_test <- cor.test(x, pred_scores)
+  c(correlation = cor_test$estimate, p_value = cor_test$p.value)
+})
+
+# Convert results to data frame for better readability
+pcorr_df <- as.data.frame(t(results))
+colnames(pcorr_df) <- c("correlation", "p_value")
+
+#  Apply a multiple testing correction if you are testing multiple correlations
+pcorr_df$adjusted_p_value <- p.adjust(pcorr_df$p_value, method = "BH")
+
+# standard error
+n_boot <- 1000
+n_features <- ncol(subsetdatamatrix2)
+boot_corrs <- matrix(NA, nrow = n_features, ncol = n_boot)
+
+for (i in 1:n_boot) {
+  # Resample indices with replacement
+  boot_indices <- sample(1:nrow(subsetdatamatrix2), replace = TRUE)
+  pred_scores_boot <- pred_scores[boot_indices]
+  
+  # Calculate bootstrapped correlations
+  boot_corrs[, i] <- apply(subsetdatamatrix2[boot_indices, ], 2, function(x) {
+    cor(x, pred_scores_boot)
+  })
+}
+# Calculate the standard error (SE) for each feature
+boot_se <- apply(boot_corrs, 1, sd)
+# Add the SE as a column to your data frame
+pcorr_df$se <- boot_se
+
+# VIP
+df_vip <- data.frame(ropls_model_6_ortho1@vipVn)
+ropls_data <- merge(pcorr_df,df_vip,by=0)
+colnames(ropls_data) <- c("Feature","pcorr","p_value","adjusted_p_value","se","VIP")
+
+
+
+```
+
+
+```{r results='asis'}
+formatted_elastic_table <- ropls_data %>%
+  kable(
+    format = "html",  # For HTML output in R Markdown
+    col.names = c("Feature", "Correlation", "P-value", "Adjusted P-value", "Standard Error", "VIP"),
+    caption = "Correlation and VIP Scores for Features"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE
+  ) %>%
+  column_spec(3:4, bold = TRUE, color = ifelse(ropls_data$adjusted_p_value < 0.05, "green", "red")) %>%
+  column_spec(6, background = "lightblue")
+```
+
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Overview of the OPLS model with 1 orthogonal."}
+plot(ropls_model_6_ortho1, typeVc = "overview") # Overview of the model
+```
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="This is the x-score plot from the OPLS model with 1 orthogonal."}
+plot(ropls_model_6_ortho1, typeVc = "x-score") # X-scores plot
+```
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Loading values of the OPLS model with 1 orthogonal."}
+plot(ropls_model_6_ortho1, typeVc = "loading") # Loadings plot
+```
+
+```{r echo=FALSE, results="asis"}
+# Extract summary statistics from the OPLS model
+summary_results <- ropls_model_6_ortho1@modelSummary
+
+# Convert the summary data to a data frame for easy rendering
+summary_df <- as.data.frame(summary_results)
+
+# Display the summary as an HTML table
+
+kable(summary_df, caption = "Summary of OPLS Results", format = "html")
+```
+
+```{r}
+volcano_plot_vip_ortho1 <- ggplot(ropls_data, aes(x =pcorr, y = VIP, color = abs(pcorr) > 0.5)) +
+     geom_point() +
+     scale_color_manual(values = c("red", "black")) +
+     labs(title = "Volcano Plot 1 orthogonal",
+          x = "p(corr)",
+          y = "VIP") +
+     theme(legend.position = "none") +  
+   #    geom_text_repel(nudge_y = 0.05, box.padding = 0.3, point.padding = 0.2)
+   geom_text(data = subset(ropls_data, abs(pcorr) > 0.5),
+                  aes(label = Feature), nudge_y = 0.01, nudge_x = -0.05, color = "blue",size=4)
+
+```
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="VIP volcano plot with 1 orthogonal."}
+volcano_plot_vip_ortho1
+```
+
+
+```{r}
+
+ropls_data_sig <- filter(ropls_data,adjusted_p_value < 0.05)
+
+sig_graph_ortho1 <- ggplot(ropls_data_sig, aes(x = reorder(Feature, correlation), y = correlation)) +
+  geom_bar(stat = "identity", fill="maroon") +
+  coord_flip() + 
+   theme(axis.text.y = element_text(size = 3)) +
+  labs(title = "Significant Features in ortho 1",
+       x = "",
+       y = "p(corr)") +
+    geom_errorbar(aes(ymin = correlation - se, ymax = correlation + se), width = 0.2)
+
+```
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Significant features with 1 orthogonal."}
+sig_graph_ortho1
+```
+
+
+
+
+```{r}
+
+## OPLS with two orthogonals
+set.seed(123)
+
+subsetdatamatrix2 <-as.matrix(subsetdatamatrix[, selected_vars_final])
+
+# Run the PLS-DA analysis
+ropls_model_6_ortho2 <- opls(subsetdatamatrix2, 
+                      Group, 
+                      predI = 1, 
+                      orthoI = 2, 
+                      scaleC = "standard",
+                      info.txtC = "none",
+                      fig.pdfC = "none",
+                      permI = 1000)
+
+# function for getting the values
+
+scores <- ropls_model_6_ortho2@scoreMN
+# Calculate the correlation loadings (pcorr)
+pred_scores <- scores[, "p1"]
+# Now calculate the pearson correlation test
+results <- apply(subsetdatamatrix2, 2, function(x) {
+  cor_test <- cor.test(x, pred_scores)
+  c(correlation = cor_test$estimate, p_value = cor_test$p.value)
+})
+
+# Convert results to data frame for better readability
+pcorr_df <- as.data.frame(t(results))
+colnames(pcorr_df) <- c("correlation", "p_value")
+
+#  Apply a multiple testing correction if you are testing multiple correlations
+pcorr_df$adjusted_p_value <- p.adjust(pcorr_df$p_value, method = "BH")
+
+# standard error
+n_boot <- 1000
+n_features <- ncol(subsetdatamatrix2)
+boot_corrs <- matrix(NA, nrow = n_features, ncol = n_boot)
+
+for (i in 1:n_boot) {
+  # Resample indices with replacement
+  boot_indices <- sample(1:nrow(subsetdatamatrix2), replace = TRUE)
+  pred_scores_boot <- pred_scores[boot_indices]
+  
+  # Calculate bootstrapped correlations
+  boot_corrs[, i] <- apply(subsetdatamatrix2[boot_indices, ], 2, function(x) {
+    cor(x, pred_scores_boot)
+  })
+}
+# Calculate the standard error (SE) for each feature
+boot_se <- apply(boot_corrs, 1, sd)
+# Add the SE as a column to your data frame
+pcorr_df$se <- boot_se
+
+# VIP
+df_vip <- data.frame(ropls_model_6_ortho2@vipVn)
+ropls_data_ortho2 <- merge(pcorr_df,df_vip,by=0)
+colnames(ropls_data_ortho2) <- c("Feature","pcorr","p_value","adjusted_p_value","se","VIP")
+
+
+```
+
+
+```{r results='asis'}
+formatted_elastic_table_ortho2 <- ropls_data_ortho2 %>%
+  kable(
+    format = "html",  # For HTML output in R Markdown
+    col.names = c("Feature", "Correlation", "P-value", "Adjusted P-value", "Standard Error", "VIP"),
+    caption = "Correlation and VIP Scores for Features with 2 orthogonals"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+    full_width = FALSE
+  ) %>%
+  column_spec(3:4, bold = TRUE, color = ifelse(ropls_data$adjusted_p_value < 0.05, "green", "red")) %>%
+  column_spec(6, background = "lightblue")
+```
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Overview of the OPLS model 2 orthogonals."}
+plot(ropls_model_6_ortho2, typeVc = "overview") # Overview of the model
+```
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="This is the x-score plot from the OPLS model 2 orthogonals."}
+plot(ropls_model_6_ortho2, typeVc = "x-score") # X-scores plot
+```
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Loading values of the OPLS model 2 orthogonals."}
+plot(ropls_model_6_ortho2, typeVc = "loading") # Loadings plot
+```
+
+```{r echo=FALSE, results="asis"}
+# Extract summary statistics from the OPLS model
+summary_results <- ropls_model_6_ortho2@modelSummary
+
+# Convert the summary data to a data frame for easy rendering
+summary_df <- as.data.frame(summary_results)
+
+# Display the summary as an HTML table
+
+kable(summary_df, caption = "Summary of OPLS Results 2 orthogonals", format = "html")
+```
+
+```{r}
+volcano_plot_vip_ortho2 <- ggplot(ropls_data_ortho2, aes(x =pcorr, y = VIP, color = abs(pcorr) > 0.5)) +
+     geom_point() +
+     scale_color_manual(values = c("red", "black")) +
+     labs(title = "Volcano plot 2 orthogonal",
+          x = "p(corr)",
+          y = "VIP") +
+     theme(legend.position = "none") +  
+   #    geom_text_repel(nudge_y = 0.05, box.padding = 0.3, point.padding = 0.2)
+   geom_text(data = subset(ropls_data_ortho2, abs(pcorr) > 0.5),
+                  aes(label = Feature), nudge_y = 0.01, nudge_x = -0.05, color = "blue",size=4)
+
+```
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="VIP Volcano plot with 2 orthogonals."}
+volcano_plot_vip_ortho2
+```
+
+
+```{r}
+
+ropls_data_sig_ortho2 <- filter(ropls_data_ortho2,adjusted_p_value < 0.05)
+
+sig_graph_ortho1 <- ggplot(ropls_data_sig_ortho2, aes(x = reorder(Feature, correlation), y = correlation)) +
+  geom_bar(stat = "identity", fill="maroon") +
+  coord_flip() + 
+   theme(axis.text.y = element_text(size = 3)) +
+  labs(title = "Significant Features in ortho 2",
+       x = "",
+       y = "p(corr)") +
+    geom_errorbar(aes(ymin = correlation - se, ymax = correlation + se), width = 0.2)
+
+```
+
+
+```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="significant Features with 2 orthogonals."}
+sig_graph_ortho2
+```
+
+

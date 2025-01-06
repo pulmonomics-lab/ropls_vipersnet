@@ -1,0 +1,291 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+mathjax: null
+params:
+  directory_output_reports: "tomt"
+  directory_and_filename_function_file: "tomt"
+  projectname: "tomt"
+  date_of_analysis: 0
+  directory_input_matrix_sampleID: "tomt"
+  filename_matrix: "tomt"
+  filename_sampleID: "tomt"
+  no_permutations_sans_vs: 0
+  no_permutations_over_vs: 0
+  no_permutations_post_vs_selected_models: 0
+  filter_percent_in_each_group: 0
+  groupsnumeric: "tomt"
+  model_strategies_to_run: 0
+  max_no_of_ortho_pre_vs: 0
+  max_no_of_ortho_post_vs: 0
+  prefered_pR2_and_pQ2_permutated_post_vs: 0
+  reordered_levels_of_groups: 0
+  pcorr_diff: 0
+  variable_selection_using_VIP: "tomt"
+
+---
+
+---
+title: "Summary ropls models `r gsub("_"," ",paste(params$projectname))`"
+author: |
+    | roplspvs: Version 0.16.0
+    | R orthogonal projections of latent structures with permutation over variable selection
+    | Marika Strom
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+
+directory_output_reports <- params$directory_output_reports
+directory_and_filename_function_file <- params$directory_and_filename_function_file
+foldername_Rmarkdownfiles <- params$foldername_Rmarkdownfiles
+projectname<-params$projectname
+date_of_analysis<-params$date_of_analysis
+directory_input_matrix_sampleID<-params$directory_input_matrix_sampleID
+filename_matrix<-params$filename_matrix
+filename_sampleID<-params$filename_sampleID
+no_permutations_sans_vs<-params$no_permutations_sans_vs
+no_permutations_over_vs<-params$no_permutations_over_vs
+no_permutations_post_vs_selected_models<-params$no_permutations_post_vs_selected_models
+filter_percent_in_each_group<-params$filter_percent_in_each_group
+groupsnumeric<-params$groupsnumeric
+model_strategies_to_run <- params$model_strategies_to_run
+max_no_of_ortho_pre_vs <- params$max_no_of_ortho_pre_vs
+max_no_of_ortho_post_vs <- params$max_no_of_ortho_post_vs
+prefered_pR2_and_pQ2_permutated_post_vs <- params$prefered_pR2_and_pQ2_permutated_post_vs
+reordered_levels_of_groups <- params$reordered_levels_of_groups
+pcorr_diff <- params$pcorr_diff
+variable_selection_using_VIP <- params$variable_selection_using_VIP
+filename_function_file <- params$filename_function_file
+directory_function_file <- "R"
+
+source("roplspvs_Functions.R")
+directory_Rmarkdownfiles <- "."
+
+knitr::opts_chunk$set(echo=TRUE, warning=TRUE, message=TRUE) 
+#knitr::opts_knit$set(root.dir=paste(directory_output_reports))
+
+#directory_output_reports <- "../outputR"
+
+library("ropls")
+library(kableExtra)
+library(gridExtra)
+library("ggpubr")
+library("matrixStats")
+library(stringr)
+library(devtools)
+library(DescTools)
+
+
+```
+
+
+Project name: `r projectname`
+
+Date of analysis: `r as.character(date_of_analysis)`
+
+Directory data matrix and sample id: `r directory_input_matrix_sampleID`
+
+Filename data matrix: `r filename_matrix`
+
+Filname sample id: `r filename_sampleID`
+
+Directory and file name function file: `r directory_and_filename_function_file`
+
+Directory rdata files: `r directory_output_reports`
+
+Permutations sans variable selection: `r no_permutations_sans_vs`
+
+Permutations over variable selection: `r no_permutations_over_vs`
+
+Permutations post variable selection in selected models: `r no_permutations_post_vs_selected_models`
+
+Missing value tolerance in each group: `r filter_percent_in_each_group`
+
+order of groups with diseased first followed by controls: `r reordered_levels_of_groups`
+
+max number of orthogonal variables in model pre variable selection: `r max_no_of_ortho_pre_vs`
+
+max number of orthogonal variables in model post variable selection: `r max_no_of_ortho_post_vs`
+
+prefered pR2 and pQ2 during model selection permutated post variable selection: `r prefered_pR2_and_pQ2_permutated_post_vs`
+
+pcorr increase allowing Q2 to decrease 1% during model selection in Model4: `r pcorr_diff`
+
+variable selection method: `r if(variable_selection_using_VIP=="yes") {paste("Using p(corr) and VIP")} else {paste("Using p(corr)")}`
+
+
+```{r, model strategy 0}
+
+if (0 %in% model_strategies_to_run) {
+  resultmodelname <- "result_Model_pre_vs"
+  description_Model0 <-
+    "Models pre variable selection and number of orthogonal variables using default ropls"
+  model_description <- description_Model0
+  model_strategy <- 0
+}
+  
+```
+
+```{r, child=if (0 %in% model_strategies_to_run) 'roplspvs_Summary_of_models_pre_vs.Rmd'}
+
+```
+
+```{r, model strategy 1}
+
+if (1 %in% model_strategies_to_run) {
+  resultmodelname <- "result_Model1"
+  permutated_modelsname <- "permutated_models_Model1"
+  percent_R2_and_Q2_in_permutated_larger_than_in_unpermutated_name <-
+    "percent_R2_and_Q2_in_permutated_larger_than_in_unpermutated_Model1"
+  description_Model1 <-
+    "Models post variable selection with userset p(corr) cutoff during variable selection and userset number of orthogonal variables pre and post variable selection"
+  model_description <- description_Model1
+  model_strategy <- 1
+}
+
+```
+
+```{r, child=if (1 %in% model_strategies_to_run) 'roplspvs_Summary_each_strategy.Rmd'}
+
+```
+
+```{r, model strategy 2}
+if (2 %in% model_strategies_to_run) {
+  resultmodelname <- "result_Model2"
+  permutated_modelsname <- "permutated_models_Model2"
+  percent_R2_and_Q2_in_permutated_larger_than_in_unpermutated_name <-
+    "percent_R2_and_Q2_in_permutated_larger_than_in_unpermutated_Model2"
+  description_Model2 <-
+    "Models post variable selection with p(corr) cutoff during variable selection corresponding to userset pearson p-value cutoff for correlation"
+  model_description  <- description_Model2
+  model_strategy <- 2
+}
+  
+```
+
+```{r, child=if (2 %in% model_strategies_to_run) 'roplspvs_Summary_each_strategy.Rmd'}
+
+```
+
+```{r, model strategy 3}
+if (3 %in% model_strategies_to_run) {
+  resultmodelname <- "result_Model3"
+  permutated_modelsname <- "permutated_models_Model3"
+  percent_R2_and_Q2_in_permutated_larger_than_in_unpermutated_name <-
+    "percent_R2_and_Q2_in_permutated_larger_than_in_unpermutated_Model3"
+  description_Model3 <-
+    "Models post variable selection with p(corr) cutoff during variable selection resulting in best performing model"
+  model_description  <- description_Model3
+  model_strategy <- 3
+}
+  
+```
+
+```{r, child=if (3 %in% model_strategies_to_run) 'roplspvs_Summary_each_strategy.Rmd'}
+
+```
+
+```{r, model strategy 4}
+if (4 %in% model_strategies_to_run) {
+  resultmodelname <- "result_Model4"
+  permutated_modelsname <- "permutated_models_Model4"
+  percent_R2_and_Q2_in_permutated_larger_than_in_unpermutated_name <-
+    "percent_R2_and_Q2_in_permutated_larger_than_in_unpermutated_Model4"
+  description_Model4 <-
+    "Models post variable selection with p(corr) cutoff during variable selection resulting in best performing model using minimal amount of variables"
+  model_description  <- description_Model4
+  model_strategy <- 4
+}
+  
+```
+
+```{r, child=if (4 %in% model_strategies_to_run) 'roplspvs_Summary_each_strategy.Rmd'}
+
+```
+
+```{r, model strategy 5}
+if (5 %in% model_strategies_to_run) {
+  resultmodelname <- "result_iterationmodel"
+  description_Model5 <-
+    "Iteration models. Variables with lowest p(corr) are removed iteratively"
+  model_description <- description_Model5
+  model_strategy <- 5
+}
+  
+```
+
+```{r, child=if (5 %in% model_strategies_to_run) 'roplspvs_Summary_iteration_model.Rmd'}
+
+```
+
+```{r, pcorr tables model strategy 2}
+if (2 %in% model_strategies_to_run) {
+  resultmodelname <- "result_Model2"
+  model_description <- description_Model2
+  model_strategy <- 2
+}
+  
+```
+
+```{r, child=if (2 %in% model_strategies_to_run) 'roplspvs_Summary_pcorr_selected_variables.Rmd'}
+
+```
+
+```{r, pcorr tables model strategy 3}
+if (3 %in% model_strategies_to_run) {
+  resultmodelname <- "result_Model3"
+  model_description <- description_Model3
+  model_strategy <- 3
+}
+  
+```
+
+```{r, child=if (3 %in% model_strategies_to_run) 'roplspvs_Summary_pcorr_selected_variables.Rmd'}
+
+```
+
+```{r, pcorr tables model strategy 4}
+if (4 %in% model_strategies_to_run) {
+  resultmodelname <- "result_Model4"
+  model_description <- description_Model4
+  model_strategy <- 4
+}
+  
+```
+
+```{r, child=if (4 %in% model_strategies_to_run) 'roplspvs_Summary_pcorr_selected_variables.Rmd'}
+
+```
+
+```{r, pcorr tables model strategy 5}
+if (5 %in% model_strategies_to_run) {
+  resultmodelname <- "result_iterationmodel"
+  model_description <- description_Model5
+  model_strategy <- 5
+}
+  
+```
+
+```{r, child=if (5 %in% model_strategies_to_run) 'roplspvs_Summary_pcorr_selected_variables.Rmd'}
+
+```
+
+```{R}
+
+save(list = ls(all.names = TRUE), file = paste(directory_output_reports,"/", "Summary_",projectname, "_",date_of_analysis,".Rdata", sep=""), envir = environment())
+
+session_info(
+    pkgs = c("loaded")[1],
+    include_base = FALSE,
+    info = c("all"),
+    dependencies = NA,
+    to_file = paste(directory_output_reports,"/", "session-info_summary_",projectname,
+    "_",date_of_analysis,"_created_",Sys.Date(),".txt", sep="")
+)
+
+```
+
