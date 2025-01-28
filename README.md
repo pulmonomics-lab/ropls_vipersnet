@@ -1,5 +1,3 @@
-# ropls_vipersnet
-
 Readme for ROPLS-ViPerSNet
 
 ROPLS-ViPerSNet: R Orthogonal Projections of Latent Structures with Variable Permutation Selection and Elastic Net
@@ -25,7 +23,7 @@ Clone the repo using git:
 apt-get install git (only if you don’t already have git installed).
 
 
-git clone https://github.com/pulmonomics-lab/roplspvs.git
+git clone https://github.com/pulmonomics-lab/ropls_vipers-net.git
 
 if it’s the first time running the program, build the conda environment using the yml file that is in the git repo that you installed:
 
@@ -54,6 +52,12 @@ After activating the conda environment and having placed your two files in the d
 Then run the following in your terminal directly. Highly recommend to do this in a tmux or a screen session.  
 
 $ R
+
+
+> install.packages("BiocManager")
+> BiocManager::install("ropls")
+
+If this is your first time running the program run the following two lines first. You only need to do this once. Then fun the command below. After you first time, you can begin here when you start R.
 
 > source("scripts/roplspvs_Run.R")
 
