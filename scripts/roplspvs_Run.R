@@ -49,4 +49,5 @@ oplspvs(directory_of_roplspvs, directory_of_analysis,
         variable_selection_using_VIP, no_of_ortho_pre_vs_Model1_joint_models, no_of_ortho_pre_vs_Model1_stratified_models,
         no_of_ortho_post_vs_Model1_joint_models, no_of_ortho_post_vs_Model1_stratified_models, max_no_of_ortho_pre_vs,  max_no_of_ortho_post_vs,
         prefered_pR2_and_pQ2_permutated_post_vs, pcorr_diff, variable_names_length, variable_names_position,
-        cluster, name_intermediate_dir, each_model_or_summary, model_strategies_to_run)
+        cluster, name_intermediate_dir, each_model_or_summary, model_strategies_to_run,filename_elstic,elastic,alpha_val,lambda_min,lambda_max,lambda_iter)
+

@@ -46,5 +46,5 @@ variable_names_position <- "all" # enter "beginning", "end" or "all" give select
 cluster <- "no" # "no" if analysis is run locally and "yes" if script is run using the bash scripts to run the R-scripts passing modelnumbers to run as arguments ("args").
 name_intermediate_dir <- "SNIC_TMP" # "name_of_directory" enter name of intermediate directory. On UPPMAX it is "SNIC_TMP" else enter "default"
 each_model_or_summary <- "both" # enter "summary" if only summary should be run and "each" if only models of each comparison should be run. Otherwise enter "both". "Both" is not possible if cluster is "yes".
-model_strategies_to_run <- c(0,1,2,3,4,5)
+model_strategies_to_run <- c(0,1,2,3,5)
 elastic <- "yes" # "yes" if you want to run elastic net and "no" if you don't

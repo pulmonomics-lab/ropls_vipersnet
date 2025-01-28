@@ -1,10 +1,4 @@
 ---
-title: "Model 6 elastic net"
-output: html_document
-date: "2024-12-02"
----
-
----
 output:
   html_document:
     toc: true
@@ -15,11 +9,7 @@ params:
   group1: "tomt"
   group2: "tomt"
   secID: "tomt"
-  pcorr_Model1: 0
-  ortho_pre_vs_Model1: 0
-  ortho_post_vs_Model1: 0
   setseedno: 0
-  p_pearson_of_pcorr_cutoff: 0
   directory_input_matrix_sampleID: "tomt"
   filename_matrix: "tomt"
   decimal_separator: "tomt"
@@ -29,10 +19,6 @@ params:
   directory_output_reports: "tomt"
   projectname: "tomt"
   date_of_analysis: 0
-  no_permutations_sans_vs: 0
-  no_permutations_post_vs: 0
-  no_permutations_post_vs_selected_models: 0
-  no_permutations_over_vs: 0
   colname_groupID: "tomt"
   colname_secID: "tomt"
   replace_0: "tomt"
@@ -40,13 +26,7 @@ params:
   replace_NA: "tomt"
   log_transform: "tomt"
   directory_and_filename_function_file: "tomt"
-  max_no_of_ortho_pre_vs: 0
-  max_no_of_ortho_post_vs: 0
-  prefered_pR2_and_pQ2_permutated_post_vs: 0
   reordered_levels_of_groups: 0
-  pcorr_diff: 0
-  variable_selection_using_VIP: "tomt"
-  model_strategies_to_run: 0
   alpha_val: 0
   lambda_min: 0
   lambda_max: 0
@@ -57,7 +37,7 @@ params:
 ---
 title: |
     | ROPLS models `r gsub("_"," ",paste(params$projectname))`
-    | Model of group `r group1` versus `r group2` for `r secID`
+    | Elastic Model of group `r group1` versus `r group2` for `r secID`
  
 author: |
     | roplspvs: Version 0.16.0
@@ -66,7 +46,7 @@ author: |
 date: `r Sys.Date()`
 ---
 
-```{r setup, include=FALSE, echo=FALSE}
+```{r setup-2, include=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, error = TRUE, fig.fullwidth = TRUE)
 # opts_chunk$set sets the parameters for the whole document
 ```
@@ -95,11 +75,7 @@ library(caret)
 group1 <- params$group1
 group2 <- params$group2
 secID <- params$secID
-pcorr_Model1 <- params$pcorr_Model1
-ortho_pre_vs_Model1 <- params$ortho_pre_vs_Model1
-ortho_post_vs_Model1 <- params$ortho_post_vs_Model1
 setseedno <- params$setseedno
-p_pearson_of_pcorr_cutoff <- params$p_pearson_of_pcorr_cutoff
 directory_input_matrix_sampleID <- params$directory_input_matrix_sampleID
 filename_matrix <- params$filename_matrix
 decimal_separator <- params$decimal_separator
@@ -109,10 +85,6 @@ filename_sampleID <- params$filename_sampleID
 directory_output_reports <- params$directory_output_reports
 projectname <- params$projectname
 date_of_analysis <- params$date_of_analysis
-no_permutations_sans_vs <- params$no_permutations_sans_vs
-no_permutations_post_vs <- params$no_permutations_post_vs
-no_permutations_post_vs_selected_models <- params$no_permutations_post_vs_selected_models
-no_permutations_over_vs <- params$no_permutations_over_vs
 colname_groupID <- params$colname_groupID
 colname_secID <- params$colname_secID
 replace_0 <- params$replace_0
@@ -120,24 +92,21 @@ filter_percent_in_each_group <- params$filter_percent_in_each_group
 replace_NA <- params$replace_NA
 log_transform <- params$log_transform
 directory_and_filename_function_file <- params$directory_and_filename_function_file
-max_no_of_ortho_pre_vs <- params$max_no_of_ortho_pre_vs
-max_no_of_ortho_post_vs <- params$max_no_of_ortho_post_vs
-prefered_pR2_and_pQ2_permutated_post_vs <- params$prefered_pR2_and_pQ2_permutated_post_vs
 reordered_levels_of_groups <- params$reordered_levels_of_groups
-pcorr_diff <- params$pcorr_diff
-variable_selection_using_VIP <- params$variable_selection_using_VIP
-model_strategies_to_run <- params$model_strategies_to_run
-
-directory_and_filename_rdata <-paste(directory_output_reports, paste(paste(projectname,date_of_analysis, group1, "vs", group2, secID,sep="_"),".Rdata", sep = ""),sep="/")
-filename_rdata <- paste(paste(projectname, date_of_analysis, group1, "vs", group2, secID,sep="_"),".Rdata", sep = "")
+alpha_val <- params$alpha_val
+lambda_min <- params$lambda_min
+lambda_max <- params$lambda_max
+lambda_iter <- params$lambda_iter
+directory_and_filename_rdata <-paste(directory_output_reports, paste(paste(projectname,date_of_analysis,"elastic", group1, "vs", group2, secID,sep="_"),".Rdata", sep = ""),sep="/")
+filename_rdata <- paste(paste(projectname, date_of_analysis, "elastic",group1, "vs", group2, secID,sep="_"),".Rdata", sep = "")
 print(filename_rdata)
-source("scripts/roplspvs_Functions.R")
-directory_and_filename_function_file <- "scripts/roplspvs_Functions.R"
+#source("scripts/roplspvs_Functions.R")
+#directory_and_filename_function_file <- "scripts/roplspvs_Functions.R"
 ```
 
 ## Data to analysis
 
-```{R loading data}
+```{R loading data 2}
 # Loading matrix and metadata
 
 directory_and_filename_input_matrix <- paste(directory_input_matrix_sampleID, "/", filename_matrix, sep = "")
@@ -199,7 +168,7 @@ pcorr increase allowing Q2 to decrease 1% during model selection in Model strate
 
 variable selection method: `r if(variable_selection_using_VIP=="yes") {paste("Using p(corr) and VIP")} else {paste("Using p(corr)")}`
 
-```{R subset sampleID and matrix}
+```{R subset sampleID and matrix 2}
 
 # subset sampleID and matrix
 
@@ -321,6 +290,9 @@ custom_grid <- expand.grid(
 
 #model6_function_glmnet(subsetdatamatrix,Group) #output variables of interest
 
+Group <- as.factor(classordered)  # Ensure it's a factor
+levels(Group) <- make.names(levels(Group))
+
 elastic_model <- train(subsetdatamatrix, Group,
                        method = "glmnet", 
                        trControl = control_repeatedcv,
@@ -362,7 +334,7 @@ subsetdatamatrix2 <-as.matrix(subsetdatamatrix[, selected_vars_final])
 
 # Run the PLS-DA analysis
 ropls_model_6_ortho0 <- opls(subsetdatamatrix2, 
-                      Group, 
+                      classordered, 
                       predI = 1, 
                       orthoI = 0, 
                       scaleC = "standard",
@@ -438,7 +410,7 @@ plot(ropls_model_6_ortho0, typeVc = "overview") # Overview of the model
 ```
 
 ```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Loading values of the OPLS model with 0 orthogonals."}
-plot(ropls_model_6_ortho0, typeVc = "loading") # Loadings plot
+plot(ropls_model_6_ortho0, typeVc = "x-loading") # Loadings plot
 ```
 
 ```{r echo=FALSE, results="asis"}
@@ -477,14 +449,14 @@ volcano_plot_vip_ortho0
 
 ropls_data_sig_ortho0 <- filter(ropls_data_ortho0,adjusted_p_value < 0.05)
 
-sig_graph_ortho0 <- ggplot(ropls_data_sig_ortho0, aes(x = reorder(Feature, correlation), y = correlation)) +
+sig_graph_ortho0 <- ggplot(ropls_data_sig_ortho0, aes(x = reorder(Feature, pcorr), y = pcorr)) +
   geom_bar(stat = "identity", fill="maroon") +
   coord_flip() + 
    theme(axis.text.y = element_text(size = 3)) +
   labs(title = "Features in ortho 0",
        x = "",
        y = "p(corr)") +
-    geom_errorbar(aes(ymin = correlation - se, ymax = correlation + se), width = 0.2)
+    geom_errorbar(aes(ymin = pcorr - se, ymax = pcorr + se), width = 0.2)
 
 ```
 
@@ -507,7 +479,7 @@ subsetdatamatrix2 <-as.matrix(subsetdatamatrix[, selected_vars_final])
 
 # Run the PLS-DA analysis
 ropls_model_6_ortho1 <- opls(subsetdatamatrix2, 
-                      Group, 
+                      classordered, 
                       predI = 1, 
                       orthoI = 1, 
                       scaleC = "standard",
@@ -589,7 +561,7 @@ plot(ropls_model_6_ortho1, typeVc = "x-score") # X-scores plot
 ```
 
 ```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Loading values of the OPLS model with 1 orthogonal."}
-plot(ropls_model_6_ortho1, typeVc = "loading") # Loadings plot
+plot(ropls_model_6_ortho1, typeVc = "x-loading") # Loadings plot
 ```
 
 ```{r echo=FALSE, results="asis"}
@@ -628,14 +600,14 @@ volcano_plot_vip_ortho1
 
 ropls_data_sig <- filter(ropls_data,adjusted_p_value < 0.05)
 
-sig_graph_ortho1 <- ggplot(ropls_data_sig, aes(x = reorder(Feature, correlation), y = correlation)) +
+sig_graph_ortho1 <- ggplot(ropls_data_sig, aes(x = reorder(Feature, pcorr), y = pcorr)) +
   geom_bar(stat = "identity", fill="maroon") +
   coord_flip() + 
    theme(axis.text.y = element_text(size = 3)) +
   labs(title = "Significant Features in ortho 1",
        x = "",
        y = "p(corr)") +
-    geom_errorbar(aes(ymin = correlation - se, ymax = correlation + se), width = 0.2)
+    geom_errorbar(aes(ymin = pcorr - se, ymax = pcorr + se), width = 0.2)
 
 ```
 
@@ -656,7 +628,7 @@ subsetdatamatrix2 <-as.matrix(subsetdatamatrix[, selected_vars_final])
 
 # Run the PLS-DA analysis
 ropls_model_6_ortho2 <- opls(subsetdatamatrix2, 
-                      Group, 
+                      classordered, 
                       predI = 1, 
                       orthoI = 2, 
                       scaleC = "standard",
@@ -736,7 +708,7 @@ plot(ropls_model_6_ortho2, typeVc = "x-score") # X-scores plot
 ```
 
 ```{r echo=FALSE, fig.height=8, fig.width=12, fig.cap="Loading values of the OPLS model 2 orthogonals."}
-plot(ropls_model_6_ortho2, typeVc = "loading") # Loadings plot
+plot(ropls_model_6_ortho2, typeVc = "x-loading") # Loadings plot
 ```
 
 ```{r echo=FALSE, results="asis"}
@@ -775,14 +747,14 @@ volcano_plot_vip_ortho2
 
 ropls_data_sig_ortho2 <- filter(ropls_data_ortho2,adjusted_p_value < 0.05)
 
-sig_graph_ortho1 <- ggplot(ropls_data_sig_ortho2, aes(x = reorder(Feature, correlation), y = correlation)) +
+sig_graph_ortho2 <- ggplot(ropls_data_sig_ortho2, aes(x = reorder(Feature, pcorr), y = pcorr)) +
   geom_bar(stat = "identity", fill="maroon") +
   coord_flip() + 
    theme(axis.text.y = element_text(size = 3)) +
   labs(title = "Significant Features in ortho 2",
        x = "",
        y = "p(corr)") +
-    geom_errorbar(aes(ymin = correlation - se, ymax = correlation + se), width = 0.2)
+    geom_errorbar(aes(ymin = pcorr - se, ymax = pcorr + se), width = 0.2)
 
 ```
 
